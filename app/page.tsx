@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import type { ChatMessage, ChatRequest, ChatStreamEvent } from "@/types/chat";
 
@@ -118,8 +119,16 @@ export default function Home() {
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 text-zinc-950 dark:bg-black dark:text-zinc-50">
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-8 sm:px-6">
-        <header className="pb-6 text-center">
-          <h1 className="text-3xl font-semibold tracking-tight">Codex 聊天</h1>
+        <header className="pb-6">
+          <div className="flex items-start justify-between gap-4">
+            <h1 className="text-3xl font-semibold tracking-tight">Codex 聊天</h1>
+            <Link
+              href="/monitor"
+              className="flex h-10 items-center rounded-xl border border-black/10 bg-white px-4 text-sm font-medium transition-colors hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+            >
+              监控
+            </Link>
+          </div>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
             输入问题，Codex 会流式返回回复。
           </p>

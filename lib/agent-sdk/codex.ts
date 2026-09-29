@@ -1,4 +1,5 @@
 import { Codex, type AgentMessageItem, type ThreadEvent } from "@openai/codex-sdk";
+import { beginCodexRequest } from "@/lib/monitor/request-metrics";
 import type { CodexStreamOptions } from "@/types/codex";
 
 const threadOptions = {
@@ -24,53 +25,60 @@ function isAgentMessageEvent(event: ThreadEvent): event is
 export async function streamCodexReply(
   options: CodexStreamOptions,
 ): Promise<void> {
-  const codex = new Codex({
-    apiKey: process.env.CODEX_API_KEY ?? process.env.OPENAI_API_KEY,
-  });
-  const thread = options.threadId
-    ? codex.resumeThread(options.threadId, threadOptions)
-    : codex.startThread(threadOptions);
-  const { events } = await thread.runStreamed(options.message, {
-    signal: options.signal,
-  });
-  const messageTexts = new Map<string, string>();
+  const requestTracker = beginCodexRequest();
 
-  for await (const event of events) {
-    if (event.type === "thread.started") {
-      options.onEvent({ type: "thread", threadId: event.thread_id });
-      continue;
-    }
+  try {
+    const codex = new Codex({});
+    const thread = options.threadId
+      ? codex.resumeThread(options.threadId, threadOptions)
+      : codex.startThread(threadOptions);
+    const { events } = await thread.runStreamed(options.message, {
+      signal: options.signal,
+    });
+    const messageTexts = new Map<string, string>();
 
-    if (isAgentMessageEvent(event)) {
-      const previousText = messageTexts.get(event.item.id) ?? "";
-
-      if (event.item.text !== previousText) {
-        if (event.item.text.startsWith(previousText)) {
-          options.onEvent({
-            type: "delta",
-            text: event.item.text.slice(previousText.length),
-          });
-        } else {
-          options.onEvent({ type: "message", text: event.item.text });
-        }
-
-        messageTexts.set(event.item.id, event.item.text);
+    for await (const event of events) {
+      if (event.type === "thread.started") {
+        options.onEvent({ type: "thread", threadId: event.thread_id });
+        continue;
       }
 
-      continue;
+      if (isAgentMessageEvent(event)) {
+        const previousText = messageTexts.get(event.item.id) ?? "";
+
+        if (event.item.text !== previousText) {
+          if (event.item.text.startsWith(previousText)) {
+            options.onEvent({
+              type: "delta",
+              text: event.item.text.slice(previousText.length),
+            });
+          } else {
+            options.onEvent({ type: "message", text: event.item.text });
+          }
+
+          messageTexts.set(event.item.id, event.item.text);
+        }
+
+        continue;
+      }
+
+      if (event.type === "turn.completed") {
+        options.onEvent({ type: "done" });
+        continue;
+      }
+
+      if (event.type === "turn.failed") {
+        throw new Error(event.error.message);
+      }
+
+      if (event.type === "error") {
+        throw new Error(event.message);
+      }
     }
 
-    if (event.type === "turn.completed") {
-      options.onEvent({ type: "done" });
-      continue;
-    }
-
-    if (event.type === "turn.failed") {
-      throw new Error(event.error.message);
-    }
-
-    if (event.type === "error") {
-      throw new Error(event.message);
-    }
+    requestTracker.succeed();
+  } catch (error) {
+    requestTracker.fail(error);
+    throw error;
   }
 }
