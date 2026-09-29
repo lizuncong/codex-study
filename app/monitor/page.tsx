@@ -3,27 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { MonitorSnapshot } from "@/types/monitor";
+import type { LoadTestSummary } from "@/types/load-test";
 
 const memoryUnits = ["KB", "MB", "GB"] as const;
 const loadTestMessage = "写3000字的作文，关于春天的";
 const maxLoadTestConcurrency = 50;
-
-type LoadTestRequestResult = {
-  succeeded: boolean;
-  durationMs: number;
-  error?: string;
-};
-
-type LoadTestSummary = {
-  concurrency: number;
-  totalMs: number;
-  succeeded: number;
-  failed: number;
-  fastestMs: number | null;
-  slowestMs: number | null;
-  averageMs: number | null;
-  errors: string[];
-};
 
 function formatMemory(kb: number): string {
   let value = kb;
@@ -175,71 +159,52 @@ export default function MonitorPage() {
     setLoadTestError(null);
     setLoadTestSummary(null);
 
-    const startedAt = performance.now();
-    let settledCount = 0;
+    try {
+      const response = await fetch("/api/load-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ concurrency, message: loadTestMessage }),
+      });
+      const result = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
 
-    const requests = Array.from({ length: concurrency }, async () => {
-      const requestStartedAt = performance.now();
+      if (!response.ok || !result) {
+        throw new Error(result?.error ?? `压测接口返回 ${response.status}`);
+      }
 
-      try {
-        const response = await fetch("/api/chat", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ message: loadTestMessage }),
-        });
+      const startedTest = result as LoadTestSummary;
+      const loadTestId = startedTest.loadTestId;
 
-        if (!response.ok) {
-          const result = (await response.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-          throw new Error(result?.error ?? `请求返回 ${response.status}`);
+      while (true) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const statusResponse = await fetch(
+          `/api/load-test?loadTestId=${encodeURIComponent(loadTestId)}`,
+          { cache: "no-store" },
+        );
+        const status = (await statusResponse.json().catch(() => null)) as
+          | (LoadTestSummary & { error?: string })
+          | null;
+
+        if (!statusResponse.ok || !status) {
+          throw new Error(status?.error ?? `压测状态返回 ${statusResponse.status}`);
         }
 
-        await response.text();
+        setLoadTestSummary(status);
+        setLoadTestConcurrency(status.concurrency);
+        setLoadTestProgress(status.succeeded + status.failed);
 
-        return {
-          succeeded: true,
-          durationMs: performance.now() - requestStartedAt,
-        } satisfies LoadTestRequestResult;
-      } catch (caughtError) {
-        return {
-          succeeded: false,
-          durationMs: performance.now() - requestStartedAt,
-          error:
-            caughtError instanceof Error
-              ? caughtError.message
-              : "压测请求失败。",
-        } satisfies LoadTestRequestResult;
-      } finally {
-        settledCount += 1;
-        setLoadTestProgress(settledCount);
+        if (status.status !== "running") {
+          return;
+        }
       }
-    });
-
-    const results = await Promise.all(requests);
-    const succeededResults = results.filter((result) => result.succeeded);
-    const durations = succeededResults.map((result) => result.durationMs);
-    const errors = results
-      .filter((result) => !result.succeeded)
-      .map((result) => result.error ?? "压测请求失败。");
-
-    setLoadTestSummary({
-      concurrency,
-      totalMs: performance.now() - startedAt,
-      succeeded: succeededResults.length,
-      failed: results.length - succeededResults.length,
-      fastestMs: durations.length === 0 ? null : Math.min(...durations),
-      slowestMs: durations.length === 0 ? null : Math.max(...durations),
-      averageMs:
-        durations.length === 0
-          ? null
-          : durations.reduce((total, duration) => total + duration, 0) /
-            durations.length,
-      errors,
-    });
-    setIsLoadTesting(false);
+    } catch (caughtError) {
+      setLoadTestError(
+        caughtError instanceof Error ? caughtError.message : "服务端压测失败。",
+      );
+    } finally {
+      setIsLoadTesting(false);
+    }
   }, [concurrencyInput]);
 
   return (
@@ -332,7 +297,7 @@ export default function MonitorPage() {
 
         {isLoadTesting ? (
           <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
-            正在并发请求 /api/chat：{loadTestProgress}/{loadTestConcurrency}
+            服务端压测中：{loadTestProgress}/{loadTestConcurrency}
           </p>
         ) : null}
 

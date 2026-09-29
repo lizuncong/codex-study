@@ -30,15 +30,24 @@ export async function streamCodexReply(
   try {
     const codex = new Codex({
       config: {
-        // 覆盖全局 ~/.codex/config.toml 中的 [mcp_servers.node_repl]。
-        // node_repl 原本是 ChatGPT 桌面端提供的 Node REPL MCP 服务，
-        // 用于让 Codex 运行 JavaScript 和访问相关桌面工具链。
-        // 一旦调用codex.resumeThread()或codex.startThread()，即使什么都不做的情况下，也会启动一个子进程来运行 node_repl。
-        // 当前 SDK 聊天场景不需要它，禁用后可避免启动额外子进程。
+        // node_repl 是全局配置注册的 Node REPL MCP 服务。
+        // cua_repl 是 unified-computer-use 插件提供的桌面/浏览器自动化 MCP，
+        // 它会再启动 node_repl 作为子进程。SDK 聊天场景都不需要。
+        // 注意：插件 MCP 必须通过 plugins.<plugin-id>.mcp_servers 覆盖；
+        // 直接放 mcp_servers.cua_repl 会生成缺少 transport 的无效配置。
         mcp_servers: {
           node_repl: {
             enabled: false,
           },
+        },
+        plugins: {
+          "unified-computer-use@openai-bundled": {
+            mcp_servers: {
+              cua_repl: {
+                enabled: false,
+              },
+          },
+        },
         },
       },
     });
@@ -46,6 +55,7 @@ export async function streamCodexReply(
       ? codex.resumeThread(options.threadId, threadOptions)
       : codex.startThread(threadOptions);
     const { events } = await thread.runStreamed(options.message, {
+      // 调用方执行 abortController.abort() 时， signal 会进入 aborted 状态，SDK 就会取消当前正在运行的 Codex 回合并停止接收事件流。
       signal: options.signal,
     });
     const messageTexts = new Map<string, string>();

@@ -8,3 +8,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+
+# Codex SDk源码
+Codex SDK源码已经下载在我本地：/Users/lzc/Documents/学习/codex/codex-rs
