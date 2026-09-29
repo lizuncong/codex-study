@@ -350,6 +350,71 @@ export default function MonitorPage() {
                 </ul>
               </div>
             ) : null}
+
+            {loadTestSummary.processes.length > 0 ? (
+              <div className="mt-5 overflow-hidden rounded-xl border border-black/5 dark:border-white/10">
+                <div className="border-b border-black/5 bg-zinc-50 px-4 py-3 dark:border-white/10 dark:bg-zinc-900">
+                  <p className="text-sm font-medium">
+                    压测期间出现过的进程（{loadTestSummary.processes.length}）
+                  </p>
+                </div>
+                <div className="max-h-80 overflow-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="sticky top-0 bg-white text-zinc-500 dark:bg-zinc-950 dark:text-zinc-400">
+                      <tr>
+                        <th className="px-4 py-2 font-medium">PID / PPID</th>
+                        <th className="px-4 py-2 font-medium">类型</th>
+                        <th className="px-4 py-2 font-medium">首次出现</th>
+                        <th className="px-4 py-2 font-medium">最后出现</th>
+                        <th className="px-4 py-2 font-medium">运行时长</th>
+                        <th className="px-4 py-2 font-medium">峰值 RSS</th>
+                        <th className="px-4 py-2 font-medium">峰值 CPU</th>
+                        <th className="px-4 py-2 font-medium">峰值内存</th>
+                        <th className="px-4 py-2 font-medium">命令</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loadTestSummary.processes.map((process) => (
+                        <tr
+                          key={`${process.pid}-${process.firstSeenAt}`}
+                          className="border-t border-black/5 dark:border-white/10"
+                        >
+                          <td className="px-4 py-2 font-mono">
+                            {process.pid} / {process.parentPid}
+                          </td>
+                          <td className="px-4 py-2">
+                            {process.category === "codex" ? "Codex" : "服务"}
+                          </td>
+                          <td className="px-4 py-2">
+                            {formatTime(process.firstSeenAt)}
+                          </td>
+                          <td className="px-4 py-2">
+                            {formatTime(process.lastSeenAt)}
+                          </td>
+                          <td className="px-4 py-2 font-mono">
+                            {process.latestElapsed}
+                          </td>
+                          <td className="px-4 py-2">
+                            {formatMemory(process.peakRssKb)}
+                          </td>
+                          <td className="px-4 py-2">
+                            {process.maxCpuPercent.toFixed(1)}%
+                          </td>
+                          <td className="px-4 py-2">
+                            {process.maxMemoryPercent.toFixed(1)}%
+                          </td>
+                          <td className="max-w-sm px-4 py-2">
+                            <span className="line-clamp-2 break-all font-mono">
+                              {process.command}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
 

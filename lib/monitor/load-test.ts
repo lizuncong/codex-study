@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 
 import { streamCodexReply } from "@/lib/agent-sdk";
+import { getMonitorSnapshot } from "@/lib/monitor/process-metrics";
 import type { LoadTestStatus, LoadTestSummary } from "@/types/load-test";
+import type { LoadTestProcess, LoadTestProcessCategory } from "@/types/load-test";
+import type { MonitorSnapshot } from "@/types/monitor";
 
 type LoadTestState = {
   id: string;
@@ -16,6 +19,7 @@ type LoadTestState = {
   startedAt: Date;
   endedAt: Date | null;
   abortController: AbortController;
+  processes: Map<number, LoadTestProcess>;
 };
 
 const loadTests = new Map<string, LoadTestState>();
@@ -49,7 +53,76 @@ function summarize(state: LoadTestState): LoadTestSummary {
     averageMs,
     totalMs,
     errors: [...state.errors],
+    processes: [...state.processes.values()].sort((left, right) =>
+      left.firstSeenAt.localeCompare(right.firstSeenAt) || left.pid - right.pid,
+    ),
   };
+}
+
+function recordProcessSamples(
+  state: LoadTestState,
+  snapshot: MonitorSnapshot,
+): void {
+  const processGroups: Array<{
+    category: LoadTestProcessCategory;
+    samples: MonitorSnapshot["codex"]["processes"];
+  }> = [
+    { category: "codex", samples: snapshot.codex.processes },
+    { category: "service", samples: snapshot.service.processes },
+  ];
+
+  for (const { category, samples } of processGroups) {
+    for (const sample of samples) {
+      const existing = state.processes.get(sample.pid);
+
+      if (existing) {
+        existing.lastSeenAt = snapshot.sampledAt;
+        existing.sampleCount += 1;
+        existing.latestElapsed = sample.elapsed;
+        existing.peakRssKb = Math.max(existing.peakRssKb, sample.rssKb);
+        existing.maxCpuPercent = Math.max(
+          existing.maxCpuPercent,
+          sample.cpuPercent,
+        );
+        existing.maxMemoryPercent = Math.max(
+          existing.maxMemoryPercent,
+          sample.memoryPercent,
+        );
+        continue;
+      }
+
+      state.processes.set(sample.pid, {
+        pid: sample.pid,
+        parentPid: sample.parentPid,
+        category,
+        command: sample.command,
+        firstSeenAt: snapshot.sampledAt,
+        lastSeenAt: snapshot.sampledAt,
+        sampleCount: 1,
+        latestElapsed: sample.elapsed,
+        peakRssKb: sample.rssKb,
+        maxCpuPercent: sample.cpuPercent,
+        maxMemoryPercent: sample.memoryPercent,
+      });
+    }
+  }
+}
+
+async function sampleProcessesWhile(
+  state: LoadTestState,
+  shouldSample: () => boolean,
+): Promise<void> {
+  while (shouldSample()) {
+    try {
+      const snapshot = await getMonitorSnapshot();
+      recordProcessSamples(state, snapshot);
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      continue;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
 }
 
 function getLoadTestState(loadTestId?: string | null): LoadTestState | null {
@@ -83,6 +156,7 @@ export function startLoadTest(input: {
     startedAt: new Date(),
     endedAt: null,
     abortController: new AbortController(),
+    processes: new Map(),
   };
 
   loadTests.set(state.id, state);
@@ -97,6 +171,9 @@ export async function runLoadTest(loadTestId: string): Promise<void> {
   if (!state || state.status !== "running") {
     return;
   }
+
+  let sampling = true;
+  const samplingTask = sampleProcessesWhile(state, () => sampling);
 
   const tasks = Array.from({ length: state.concurrency }, async () => {
     const startedAt = performance.now();
@@ -126,6 +203,8 @@ export async function runLoadTest(loadTestId: string): Promise<void> {
   });
 
   await Promise.all(tasks);
+  sampling = false;
+  await samplingTask;
 
   state.endedAt = new Date();
 
