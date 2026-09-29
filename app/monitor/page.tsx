@@ -515,7 +515,7 @@ export default function MonitorPage() {
                   <table className="w-full min-w-[1080px] text-left text-sm">
                     <thead>
                       <tr className="border-b border-black/5 text-xs uppercase tracking-wide text-zinc-500 dark:border-white/10 dark:text-zinc-400">
-                        <th className="pb-3 pr-4 font-medium">层级</th>
+                        <th className="pb-3 pr-4 font-medium">树形</th>
                         <th className="pb-3 pr-4 font-medium">PID</th>
                         <th className="pb-3 pr-4 font-medium">PPID</th>
                         <th className="pb-3 pr-4 font-medium">运行时长</th>
@@ -528,7 +528,12 @@ export default function MonitorPage() {
                     <tbody className="divide-y divide-black/5 dark:divide-white/5">
                       {snapshot.service.processes.map((process) => (
                         <tr key={process.pid}>
-                          <td className="py-3 pr-4 font-mono">{process.depth}</td>
+                          <td
+                            className="py-3 pr-4 font-mono text-xs text-zinc-400 dark:text-zinc-600"
+                            style={{ paddingLeft: `${process.depth * 18}px` }}
+                          >
+                            {process.depth === 0 ? "○" : "└"}
+                          </td>
                           <td className="py-3 pr-4 font-mono">{process.pid}</td>
                           <td className="py-3 pr-4 font-mono">{process.parentPid}</td>
                           <td className="py-3 pr-4 font-mono">{process.elapsed}</td>

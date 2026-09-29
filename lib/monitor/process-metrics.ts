@@ -147,11 +147,7 @@ function collectProcessTrees(
     visit(rootPid, includeRoot ? 0 : 1);
   }
 
-  return processes.sort((first, second) =>
-    first.depth === second.depth
-      ? first.pid - second.pid
-      : first.depth - second.depth,
-  );
+  return processes;
 }
 
 export async function getMonitorSnapshot(): Promise<MonitorSnapshot> {
