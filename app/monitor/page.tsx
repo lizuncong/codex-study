@@ -5,6 +5,25 @@ import { useCallback, useEffect, useState } from "react";
 import type { MonitorSnapshot } from "@/types/monitor";
 
 const memoryUnits = ["KB", "MB", "GB"] as const;
+const loadTestMessage = "写3000字的作文，关于春天的";
+const maxLoadTestConcurrency = 50;
+
+type LoadTestRequestResult = {
+  succeeded: boolean;
+  durationMs: number;
+  error?: string;
+};
+
+type LoadTestSummary = {
+  concurrency: number;
+  totalMs: number;
+  succeeded: number;
+  failed: number;
+  fastestMs: number | null;
+  slowestMs: number | null;
+  averageMs: number | null;
+  errors: string[];
+};
 
 function formatMemory(kb: number): string {
   let value = kb;
@@ -69,6 +88,13 @@ export default function MonitorPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [refreshIntervalMs, setRefreshIntervalMs] = useState(1000);
+  const [concurrencyInput, setConcurrencyInput] = useState("10");
+  const [isLoadTesting, setIsLoadTesting] = useState(false);
+  const [loadTestConcurrency, setLoadTestConcurrency] = useState(0);
+  const [loadTestProgress, setLoadTestProgress] = useState(0);
+  const [loadTestError, setLoadTestError] = useState<string | null>(null);
+  const [loadTestSummary, setLoadTestSummary] =
+    useState<LoadTestSummary | null>(null);
 
   const loadSnapshot = useCallback(
     async (signal: AbortSignal, silent = false) => {
@@ -131,6 +157,91 @@ export default function MonitorPage() {
     loadSnapshot(abortController.signal);
   }, [loadSnapshot]);
 
+  const startLoadTest = useCallback(async () => {
+    const concurrency = Number(concurrencyInput);
+
+    if (
+      !Number.isInteger(concurrency) ||
+      concurrency < 1 ||
+      concurrency > maxLoadTestConcurrency
+    ) {
+      setLoadTestError(`并发数量必须是 1-${maxLoadTestConcurrency} 的整数。`);
+      return;
+    }
+
+    setIsLoadTesting(true);
+    setLoadTestConcurrency(concurrency);
+    setLoadTestProgress(0);
+    setLoadTestError(null);
+    setLoadTestSummary(null);
+
+    const startedAt = performance.now();
+    let settledCount = 0;
+
+    const requests = Array.from({ length: concurrency }, async () => {
+      const requestStartedAt = performance.now();
+
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ message: loadTestMessage }),
+        });
+
+        if (!response.ok) {
+          const result = (await response.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+          throw new Error(result?.error ?? `请求返回 ${response.status}`);
+        }
+
+        await response.text();
+
+        return {
+          succeeded: true,
+          durationMs: performance.now() - requestStartedAt,
+        } satisfies LoadTestRequestResult;
+      } catch (caughtError) {
+        return {
+          succeeded: false,
+          durationMs: performance.now() - requestStartedAt,
+          error:
+            caughtError instanceof Error
+              ? caughtError.message
+              : "压测请求失败。",
+        } satisfies LoadTestRequestResult;
+      } finally {
+        settledCount += 1;
+        setLoadTestProgress(settledCount);
+      }
+    });
+
+    const results = await Promise.all(requests);
+    const succeededResults = results.filter((result) => result.succeeded);
+    const durations = succeededResults.map((result) => result.durationMs);
+    const errors = results
+      .filter((result) => !result.succeeded)
+      .map((result) => result.error ?? "压测请求失败。");
+
+    setLoadTestSummary({
+      concurrency,
+      totalMs: performance.now() - startedAt,
+      succeeded: succeededResults.length,
+      failed: results.length - succeededResults.length,
+      fastestMs: durations.length === 0 ? null : Math.min(...durations),
+      slowestMs: durations.length === 0 ? null : Math.max(...durations),
+      averageMs:
+        durations.length === 0
+          ? null
+          : durations.reduce((total, duration) => total + duration, 0) /
+            durations.length,
+      errors,
+    });
+    setIsLoadTesting(false);
+  }, [concurrencyInput]);
+
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 text-zinc-950 dark:bg-black dark:text-zinc-50">
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
@@ -142,6 +253,25 @@ export default function MonitorPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={maxLoadTestConcurrency}
+              step={1}
+              value={concurrencyInput}
+              onChange={(event) => setConcurrencyInput(event.target.value)}
+              disabled={isLoadTesting}
+              className="h-10 w-24 rounded-xl border border-black/10 bg-white px-3 text-sm outline-none disabled:cursor-not-allowed disabled:bg-zinc-100 dark:border-white/10 dark:bg-zinc-950 dark:disabled:bg-zinc-900"
+              placeholder="并发数"
+            />
+            <button
+              type="button"
+              onClick={startLoadTest}
+              disabled={isLoadTesting}
+              className="h-10 rounded-xl bg-zinc-950 px-4 text-sm font-medium text-zinc-50 transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200 dark:disabled:bg-zinc-700"
+            >
+              {isLoadTesting ? "压测中" : "开始压测"}
+            </button>
             <select
               value={refreshIntervalMs}
               onChange={(event) => setRefreshIntervalMs(Number(event.target.value))}
@@ -193,6 +323,70 @@ export default function MonitorPage() {
                 : "正在连接监控接口…"}
           </span>
         </div>
+
+        {loadTestError ? (
+          <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
+            {loadTestError}
+          </p>
+        ) : null}
+
+        {isLoadTesting ? (
+          <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+            正在并发请求 /api/chat：{loadTestProgress}/{loadTestConcurrency}
+          </p>
+        ) : null}
+
+        {loadTestSummary ? (
+          <div className="mt-4 rounded-2xl border border-black/5 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-zinc-950">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">并发压测结果</h2>
+              <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                并发 {loadTestSummary.concurrency} · 总耗时{" "}
+                {formatDuration(loadTestSummary.totalMs)}
+              </span>
+            </div>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard
+                label="成功"
+                value={String(loadTestSummary.succeeded)}
+                hint={`失败 ${loadTestSummary.failed}`}
+              />
+              <StatCard
+                label="平均耗时"
+                value={
+                  loadTestSummary.averageMs === null
+                    ? "—"
+                    : formatDuration(loadTestSummary.averageMs)
+                }
+                hint={`最快 ${loadTestSummary.fastestMs === null ? "—" : formatDuration(loadTestSummary.fastestMs)}`}
+              />
+              <StatCard
+                label="最慢耗时"
+                value={
+                  loadTestSummary.slowestMs === null
+                    ? "—"
+                    : formatDuration(loadTestSummary.slowestMs)
+                }
+                hint="单次请求"
+              />
+              <StatCard
+                label="总耗时"
+                value={formatDuration(loadTestSummary.totalMs)}
+                hint="全部请求完成"
+              />
+            </div>
+            {loadTestSummary.errors.length > 0 ? (
+              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
+                <p className="font-medium">前 3 个错误</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {loadTestSummary.errors.slice(0, 3).map((errorMessage) => (
+                    <li key={errorMessage}>{errorMessage}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {error ? (
           <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
