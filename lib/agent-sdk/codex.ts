@@ -33,6 +33,7 @@ export async function streamCodexReply(
         // 覆盖全局 ~/.codex/config.toml 中的 [mcp_servers.node_repl]。
         // node_repl 原本是 ChatGPT 桌面端提供的 Node REPL MCP 服务，
         // 用于让 Codex 运行 JavaScript 和访问相关桌面工具链。
+        // 一旦调用codex.resumeThread()或codex.startThread()，即使什么都不做的情况下，也会启动一个子进程来运行 node_repl。
         // 当前 SDK 聊天场景不需要它，禁用后可避免启动额外子进程。
         mcp_servers: {
           node_repl: {
