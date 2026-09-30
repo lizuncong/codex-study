@@ -28,5 +28,7 @@ export type LoadTestSummary = {
   averageMs: number | null;
   totalMs: number;
   errors: string[];
+  peakRssKb: number;
+  peakCpuPercent: number;
   processes: LoadTestProcess[];
 };

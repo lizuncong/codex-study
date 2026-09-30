@@ -310,7 +310,7 @@ export default function MonitorPage() {
                 {formatDuration(loadTestSummary.totalMs)}
               </span>
             </div>
-            <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
               <StatCard
                 label="成功"
                 value={String(loadTestSummary.succeeded)}
@@ -338,6 +338,16 @@ export default function MonitorPage() {
                 label="总耗时"
                 value={formatDuration(loadTestSummary.totalMs)}
                 hint="全部请求完成"
+              />
+              <StatCard
+                label="内存峰值"
+                value={formatMemory(loadTestSummary.peakRssKb)}
+                hint="进程树合计 RSS"
+              />
+              <StatCard
+                label="CPU 峰值"
+                value={`${loadTestSummary.peakCpuPercent.toFixed(1)}%`}
+                hint="进程树合计 CPU"
               />
             </div>
             {loadTestSummary.errors.length > 0 ? (

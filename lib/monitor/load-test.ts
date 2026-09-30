@@ -20,6 +20,8 @@ type LoadTestState = {
   endedAt: Date | null;
   abortController: AbortController;
   processes: Map<number, LoadTestProcess>;
+  peakRssKb: number;
+  peakCpuPercent: number;
 };
 
 const loadTests = new Map<string, LoadTestState>();
@@ -53,6 +55,8 @@ function summarize(state: LoadTestState): LoadTestSummary {
     averageMs,
     totalMs,
     errors: [...state.errors],
+    peakRssKb: state.peakRssKb,
+    peakCpuPercent: state.peakCpuPercent,
     processes: [...state.processes.values()].sort((left, right) =>
       left.firstSeenAt.localeCompare(right.firstSeenAt) || left.pid - right.pid,
     ),
@@ -106,6 +110,18 @@ function recordProcessSamples(
       });
     }
   }
+
+  state.peakRssKb = Math.max(
+    state.peakRssKb,
+    snapshot.service.totalRssKb,
+  );
+  state.peakCpuPercent = Math.max(
+    state.peakCpuPercent,
+    snapshot.service.processes.reduce(
+      (total, process) => total + process.cpuPercent,
+      0,
+    ),
+  );
 }
 
 async function sampleProcessesWhile(
@@ -157,6 +173,8 @@ export function startLoadTest(input: {
     endedAt: null,
     abortController: new AbortController(),
     processes: new Map(),
+    peakRssKb: 0,
+    peakCpuPercent: 0,
   };
 
   loadTests.set(state.id, state);
