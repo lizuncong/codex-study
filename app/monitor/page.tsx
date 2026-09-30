@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { MonitorSnapshot } from "@/types/monitor";
 import type { LoadTestSummary } from "@/types/load-test";
 
 const memoryUnits = ["KB", "MB", "GB"] as const;
-const loadTestMessage = "写3000字的作文，关于春天的";
+const defaultLoadTestPrompt = "写1000字关于春天的作文";
 const maxLoadTestConcurrency = 50;
 
 function formatMemory(kb: number): string {
@@ -73,6 +72,9 @@ export default function MonitorPage() {
   const [isPaused, setIsPaused] = useState(false);
   const [refreshIntervalMs, setRefreshIntervalMs] = useState(1000);
   const [concurrencyInput, setConcurrencyInput] = useState("10");
+  const [loadTestPromptInput, setLoadTestPromptInput] = useState(
+    defaultLoadTestPrompt,
+  );
   const [isLoadTesting, setIsLoadTesting] = useState(false);
   const [loadTestConcurrency, setLoadTestConcurrency] = useState(0);
   const [loadTestProgress, setLoadTestProgress] = useState(0);
@@ -143,6 +145,7 @@ export default function MonitorPage() {
 
   const startLoadTest = useCallback(async () => {
     const concurrency = Number(concurrencyInput);
+    const prompt = loadTestPromptInput.trim();
 
     if (
       !Number.isInteger(concurrency) ||
@@ -150,6 +153,11 @@ export default function MonitorPage() {
       concurrency > maxLoadTestConcurrency
     ) {
       setLoadTestError(`并发数量必须是 1-${maxLoadTestConcurrency} 的整数。`);
+      return;
+    }
+
+    if (!prompt) {
+      setLoadTestError("请输入压测使用的 prompt。");
       return;
     }
 
@@ -163,7 +171,7 @@ export default function MonitorPage() {
       const response = await fetch("/api/load-test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ concurrency, message: loadTestMessage }),
+        body: JSON.stringify({ concurrency, message: prompt }),
       });
       const result = (await response.json().catch(() => null)) as {
         error?: string;
@@ -205,7 +213,7 @@ export default function MonitorPage() {
     } finally {
       setIsLoadTesting(false);
     }
-  }, [concurrencyInput]);
+  }, [concurrencyInput, loadTestPromptInput]);
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 text-zinc-950 dark:bg-black dark:text-zinc-50">
@@ -218,6 +226,14 @@ export default function MonitorPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              value={loadTestPromptInput}
+              onChange={(event) => setLoadTestPromptInput(event.target.value)}
+              disabled={isLoadTesting}
+              className="h-10 w-72 rounded-xl border border-black/10 bg-white px-3 text-sm outline-none disabled:cursor-not-allowed disabled:bg-zinc-100 dark:border-white/10 dark:bg-zinc-950 dark:disabled:bg-zinc-900"
+              placeholder="压测 prompt"
+            />
             <input
               type="number"
               min={1}
@@ -261,12 +277,6 @@ export default function MonitorPage() {
             >
               立即刷新
             </button>
-            <Link
-              href="/"
-              className="flex h-10 items-center rounded-xl border border-black/10 bg-white px-4 text-sm font-medium transition-colors hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-950 dark:hover:bg-zinc-900"
-            >
-              返回聊天
-            </Link>
           </div>
         </header>
 
