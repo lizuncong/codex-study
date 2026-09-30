@@ -14,6 +14,7 @@ export async function POST(request: Request) {
   let requestBody: {
     concurrency?: unknown;
     message?: unknown;
+    customToolsEnabled?: unknown;
   };
 
   try {
@@ -25,6 +26,11 @@ export async function POST(request: Request) {
   const concurrency = Number(requestBody.concurrency);
   const message =
     typeof requestBody.message === "string" ? requestBody.message.trim() : "";
+  // 复选框未提交时保持旧行为：压测默认注册 Codex stdio 自定义工具。
+  const customToolsEnabled =
+    requestBody.customToolsEnabled === undefined
+      ? true
+      : requestBody.customToolsEnabled === true;
 
   if (
     !Number.isInteger(concurrency) ||
@@ -41,7 +47,11 @@ export async function POST(request: Request) {
     return Response.json({ error: "请输入要发送的内容。" }, { status: 400 });
   }
 
-  const loadTest = startLoadTest({ concurrency, message });
+  const loadTest = startLoadTest({
+    concurrency,
+    message,
+    customToolsEnabled,
+  });
 
   after(() => runLoadTest(loadTest.loadTestId));
 

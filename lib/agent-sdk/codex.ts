@@ -22,7 +22,11 @@ export async function streamCodexReply(
   const requestTracker = beginCodexRequest();
 
   try {
-    const customToolsConfig = buildCustomToolsConfig();
+    // 聊天和压测默认启用自定义工具；压测可以显式关闭，用于对比工具注册带来的资源消耗。
+    const customToolsEnabled = options.customToolsEnabled ?? true;
+    const customToolsConfig = customToolsEnabled
+      ? buildCustomToolsConfig()
+      : { mcp_servers: {} };
 
     const codex = new Codex({
       config: {

@@ -10,6 +10,7 @@ type LoadTestState = {
   id: string;
   concurrency: number;
   message: string;
+  customToolsEnabled: boolean;
   status: LoadTestStatus;
   active: number;
   succeeded: number;
@@ -152,6 +153,7 @@ function getLoadTestState(loadTestId?: string | null): LoadTestState | null {
 export function startLoadTest(input: {
   concurrency: number;
   message: string;
+  customToolsEnabled: boolean;
 }): LoadTestSummary {
   const currentTest = getLoadTestState();
 
@@ -163,6 +165,7 @@ export function startLoadTest(input: {
     id: randomUUID(),
     concurrency: input.concurrency,
     message: input.message,
+    customToolsEnabled: input.customToolsEnabled,
     status: "running",
     active: 0,
     succeeded: 0,
@@ -200,6 +203,7 @@ export async function runLoadTest(loadTestId: string): Promise<void> {
     try {
       await streamCodexReply({
         message: state.message,
+        customToolsEnabled: state.customToolsEnabled,
         signal: state.abortController.signal,
         onEvent: () => {},
       });
