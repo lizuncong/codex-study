@@ -688,6 +688,9 @@ Server 执行并返回结果
 Client 把结果交回 LLM
 ```
 
+<img width="827" height="695" alt="image" src="https://github.com/user-attachments/assets/8574f8c5-e4a0-4a3b-ba1b-e92aeb9951fd" />
+
+
 常见传输方式：
 
 | 类型 | 通信方式 | 例子 |
