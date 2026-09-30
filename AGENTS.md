@@ -12,3 +12,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Codex SDk源码
 Codex SDK源码已经下载在我本地：/Users/lzc/Documents/学习/codex/codex-rs
+
+# 硬性规则
+- 必须为关键逻辑，配置等添加必要的中文注释，解释这是做什么的，为啥要这么做
+- 必须维护相关的项目文档，在docs目录下
