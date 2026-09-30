@@ -1,5 +1,11 @@
-import { Codex, type AgentMessageItem, type ThreadEvent } from "@openai/codex-sdk";
+import { Codex } from "@openai/codex-sdk";
 import { beginCodexRequest } from "@/lib/monitor/request-metrics";
+import { buildCustomToolsConfig } from "@/lib/agent-sdk/custom-tools";
+import {
+  getToolCallSummary,
+  isAgentMessageEvent,
+  isMcpToolCallEvent,
+} from "@/lib/agent-sdk/codex-events";
 import type { CodexStreamOptions } from "@/types/codex";
 
 const threadOptions = {
@@ -10,24 +16,14 @@ const threadOptions = {
   sandboxMode: "read-only",
 } as const;
 
-function isAgentMessageEvent(event: ThreadEvent): event is
-  | { type: "item.started"; item: AgentMessageItem }
-  | { type: "item.updated"; item: AgentMessageItem }
-  | { type: "item.completed"; item: AgentMessageItem } {
-  return (
-    (event.type === "item.started" ||
-      event.type === "item.updated" ||
-      event.type === "item.completed") &&
-    event.item.type === "agent_message"
-  );
-}
-
 export async function streamCodexReply(
   options: CodexStreamOptions,
 ): Promise<void> {
   const requestTracker = beginCodexRequest();
 
   try {
+    const customToolsConfig = buildCustomToolsConfig();
+
     const codex = new Codex({
       config: {
         // node_repl 是全局配置注册的 Node REPL MCP 服务。
@@ -36,6 +32,8 @@ export async function streamCodexReply(
         // 注意：插件 MCP 必须通过 plugins.<plugin-id>.mcp_servers 覆盖；
         // 直接放 mcp_servers.cua_repl 会生成缺少 transport 的无效配置。
         mcp_servers: {
+          // 必须合并而不是覆盖，否则 project_tools 会在这里被丢弃。
+          ...customToolsConfig.mcp_servers,
           node_repl: {
             enabled: false,
           },
@@ -82,6 +80,18 @@ export async function streamCodexReply(
           messageTexts.set(event.item.id, event.item.text);
         }
 
+        continue;
+      }
+
+      if (isMcpToolCallEvent(event)) {
+        options.onEvent({
+          type: "tool",
+          toolId: event.item.id,
+          server: event.item.server,
+          tool: event.item.tool,
+          status: event.item.status,
+          summary: getToolCallSummary(event.item),
+        });
         continue;
       }
 

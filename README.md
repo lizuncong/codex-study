@@ -16,6 +16,8 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+项目内置了 `project_tools` MCP stdio server。聊天时可以请求 Codex 调用 `get_project_info` 或 `read_project_file`，实现说明见 `docs/custom-tools-stdio.md`，协议原理见 `docs/mcp-stdio-working-principle.md`。
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

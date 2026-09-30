@@ -102,6 +102,35 @@ export default function Home() {
                   : message,
               ),
             );
+          } else if (streamEvent.type === "tool") {
+            setMessages((current) =>
+              current.map((message) => {
+                if (message.id !== assistantMessage.id) {
+                  return message;
+                }
+
+                const tools = message.tools ?? [];
+                const existingIndex = tools.findIndex(
+                  (toolCall) => toolCall.id === streamEvent.toolId,
+                );
+                const nextToolCall = {
+                  id: streamEvent.toolId,
+                  server: streamEvent.server,
+                  tool: streamEvent.tool,
+                  status: streamEvent.status,
+                  summary: streamEvent.summary,
+                };
+
+                if (existingIndex === -1) {
+                  return { ...message, tools: [...tools, nextToolCall] };
+                }
+
+                return {
+                  ...message,
+                  tools: tools.with(existingIndex, nextToolCall),
+                };
+              }),
+            );
           } else if (streamEvent.type === "error") {
             throw new Error(streamEvent.message);
           }
@@ -159,6 +188,34 @@ export default function Home() {
                       : "border border-black/5 bg-zinc-100 dark:border-white/10 dark:bg-zinc-900"
                   }`}
                 >
+                  {message.role === "assistant" && message.tools ? (
+                    <div className="mb-3 flex flex-col gap-2">
+                      {message.tools.map((toolCall) => (
+                        <div
+                          key={toolCall.id}
+                          className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs dark:border-zinc-800 dark:bg-zinc-900"
+                        >
+                          <div className="flex items-center gap-2 font-medium">
+                            <span
+                              className={`size-1.5 rounded-full ${
+                                toolCall.status === "in_progress"
+                                  ? "animate-pulse bg-amber-500"
+                                  : toolCall.status === "completed"
+                                    ? "bg-emerald-500"
+                                    : "bg-red-500"
+                              }`}
+                            />
+                            {toolCall.server} / {toolCall.tool}
+                          </div>
+                          {toolCall.summary ? (
+                            <p className="mt-1 whitespace-pre-wrap break-all text-zinc-600 dark:text-zinc-400">
+                              {toolCall.summary}
+                            </p>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                   {message.role === "assistant" && !message.content ? (
                     <span className="inline-flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
                       <span className="size-1.5 animate-pulse rounded-full bg-current" />
@@ -191,7 +248,7 @@ export default function Home() {
                 }
               }}
               rows={2}
-              placeholder="向 Codex 发送消息…"
+            placeholder="向 Codex 发送消息…"
               className="max-h-40 flex-1 resize-none bg-transparent text-sm leading-6 outline-none placeholder:text-zinc-500"
               disabled={isStreaming}
             />
@@ -203,9 +260,10 @@ export default function Home() {
               {isStreaming ? "发送中" : "发送"}
             </button>
           </div>
-          <p className="mt-2 px-1 text-xs text-zinc-500 dark:text-zinc-500">
-            Enter 发送，Shift + Enter 换行。
-          </p>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-zinc-500 dark:text-zinc-500">
+            <p>Enter 发送，Shift + Enter 换行。</p>
+            <p>自定义工具：get_project_info、read_project_file。</p>
+          </div>
         </form>
       </main>
     </div>

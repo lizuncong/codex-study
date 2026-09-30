@@ -2,6 +2,17 @@ export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
+  tools?: ChatToolCall[];
+};
+
+export type ChatToolCallStatus = "in_progress" | "completed" | "failed";
+
+export type ChatToolCall = {
+  id: string;
+  server: string;
+  tool: string;
+  status: ChatToolCallStatus;
+  summary?: string;
 };
 
 export type ChatRequest = {
@@ -21,6 +32,14 @@ export type ChatStreamEvent =
   | {
       type: "message";
       text: string;
+    }
+  | {
+      type: "tool";
+      toolId: string;
+      server: string;
+      tool: string;
+      status: ChatToolCallStatus;
+      summary?: string;
     }
   | {
       type: "done";
