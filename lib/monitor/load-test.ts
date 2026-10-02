@@ -11,6 +11,8 @@ type LoadTestState = {
   concurrency: number;
   message: string;
   customToolsEnabled: boolean;
+  // 开启后每个压测请求都会注册 3 个 stdio MCP server，用于验证“一配置一进程”。
+  mcpMultiprocessEnabled: boolean;
   status: LoadTestStatus;
   active: number;
   succeeded: number;
@@ -27,6 +29,9 @@ type LoadTestState = {
 
 const loadTests = new Map<string, LoadTestState>();
 let latestLoadTestId: string | null = null;
+
+// 固定为 3 足够区分 0/1/N 的进程形态，同时避免压测时创建过多子进程。
+const MCP_MULTIPROCESS_SERVER_COUNT = 3;
 
 function summarize(state: LoadTestState): LoadTestSummary {
   const finishedAt = state.endedAt ?? new Date();
@@ -154,6 +159,7 @@ export function startLoadTest(input: {
   concurrency: number;
   message: string;
   customToolsEnabled: boolean;
+  mcpMultiprocessEnabled: boolean;
 }): LoadTestSummary {
   const currentTest = getLoadTestState();
 
@@ -166,6 +172,7 @@ export function startLoadTest(input: {
     concurrency: input.concurrency,
     message: input.message,
     customToolsEnabled: input.customToolsEnabled,
+    mcpMultiprocessEnabled: input.mcpMultiprocessEnabled,
     status: "running",
     active: 0,
     succeeded: 0,
@@ -204,6 +211,9 @@ export async function runLoadTest(loadTestId: string): Promise<void> {
       await streamCodexReply({
         message: state.message,
         customToolsEnabled: state.customToolsEnabled,
+        projectToolsServerCount: state.mcpMultiprocessEnabled
+          ? MCP_MULTIPROCESS_SERVER_COUNT
+          : 1,
         signal: state.abortController.signal,
         onEvent: () => {},
       });

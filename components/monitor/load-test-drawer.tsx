@@ -15,6 +15,7 @@ export function LoadTestDrawer() {
   const [concurrencyInput, setConcurrencyInput] = useState("10");
   const [promptInput, setPromptInput] = useState(defaultLoadTestPrompt);
   const [customToolsEnabled, setCustomToolsEnabled] = useState(true);
+  const [mcpMultiprocessEnabled, setMcpMultiprocessEnabled] = useState(false);
   const [isLoadTesting, setIsLoadTesting] = useState(false);
   const [loadTestConcurrency, setLoadTestConcurrency] = useState(0);
   const [loadTestProgress, setLoadTestProgress] = useState(0);
@@ -54,6 +55,7 @@ export function LoadTestDrawer() {
           concurrency,
           message: prompt,
           customToolsEnabled,
+          mcpMultiprocessEnabled,
         }),
       });
       const result = (await response.json().catch(() => null)) as {
@@ -97,7 +99,12 @@ export function LoadTestDrawer() {
     } finally {
       setIsLoadTesting(false);
     }
-  }, [concurrencyInput, customToolsEnabled, promptInput]);
+  }, [
+    concurrencyInput,
+    customToolsEnabled,
+    mcpMultiprocessEnabled,
+    promptInput,
+  ]);
 
   return (
     <>
@@ -153,6 +160,21 @@ export function LoadTestDrawer() {
               </span>
             </label>
 
+            <label className="mt-3 flex items-start gap-3">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 rounded border-black/20 accent-zinc-950 dark:border-white/20 dark:bg-zinc-900 dark:accent-zinc-100"
+                checked={mcpMultiprocessEnabled}
+                disabled={isLoadTesting || !customToolsEnabled}
+                onChange={(event) =>
+                  setMcpMultiprocessEnabled(event.target.checked)
+                }
+              />
+              <span className="text-sm font-medium">
+                stdio MCP 多进程验证
+              </span>
+            </label>
+
             <details className="mt-3 text-sm">
               <summary className="cursor-pointer text-zinc-600 dark:text-zinc-400">
                 可用工具和触发方法
@@ -161,6 +183,13 @@ export function LoadTestDrawer() {
                 <p>
                   勾选后，每个压测请求都会注册本地 <code>project_tools</code> MCP
                   server，并启动对应的 stdio 子进程。
+                </p>
+                <p>
+                  开启 <span className="font-medium">stdio MCP
+                  多进程验证</span> 后，每个压测请求会注册 3 个
+                  <code>project_tools</code> 配置，用来确认 stdio MCP
+                  的进程粒度。压测并发较高时会按
+                  <span className="font-medium">并发数 × 3</span> 创建子进程。
                 </p>
                 <ul className="list-disc space-y-1 pl-5">
                   <li>

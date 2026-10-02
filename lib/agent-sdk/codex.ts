@@ -24,8 +24,16 @@ export async function streamCodexReply(
   try {
     // 聊天和压测默认启用自定义工具；压测可以显式关闭，用于对比工具注册带来的资源消耗。
     const customToolsEnabled = options.customToolsEnabled ?? true;
+    // 压测面板可以显式开启多进程验证；普通聊天不传该参数时保持单 server 行为。
+    const projectToolsServerCount =
+      options.projectToolsServerCount === undefined
+        ? 1
+        : Number.isInteger(options.projectToolsServerCount) &&
+            options.projectToolsServerCount > 0
+          ? options.projectToolsServerCount
+          : 1;
     const customToolsConfig = customToolsEnabled
-      ? buildCustomToolsConfig()
+      ? buildCustomToolsConfig(projectToolsServerCount)
       : { mcp_servers: {} };
 
     const codex = new Codex({

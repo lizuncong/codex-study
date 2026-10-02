@@ -15,6 +15,7 @@ export async function POST(request: Request) {
     concurrency?: unknown;
     message?: unknown;
     customToolsEnabled?: unknown;
+    mcpMultiprocessEnabled?: unknown;
   };
 
   try {
@@ -31,6 +32,8 @@ export async function POST(request: Request) {
     requestBody.customToolsEnabled === undefined
       ? true
       : requestBody.customToolsEnabled === true;
+  // 复选框关闭或旧客户端未传值时，仍保持单 project_tools server。
+  const mcpMultiprocessEnabled = requestBody.mcpMultiprocessEnabled === true;
 
   if (
     !Number.isInteger(concurrency) ||
@@ -51,6 +54,7 @@ export async function POST(request: Request) {
     concurrency,
     message,
     customToolsEnabled,
+    mcpMultiprocessEnabled,
   });
 
   after(() => runLoadTest(loadTest.loadTestId));
