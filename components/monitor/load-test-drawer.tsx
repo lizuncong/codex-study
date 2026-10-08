@@ -15,6 +15,9 @@ export function LoadTestDrawer() {
   const [concurrencyInput, setConcurrencyInput] = useState("10");
   const [promptInput, setPromptInput] = useState(defaultLoadTestPrompt);
   const [customToolsEnabled, setCustomToolsEnabled] = useState(true);
+  // 默认使用 Codex 原生系统提示词；只有用户显式勾选才注入项目自定义模板。
+  const [customSystemPromptEnabled, setCustomSystemPromptEnabled] =
+    useState(false);
   const [mcpMultiprocessEnabled, setMcpMultiprocessEnabled] = useState(false);
   const [isLoadTesting, setIsLoadTesting] = useState(false);
   const [loadTestConcurrency, setLoadTestConcurrency] = useState(0);
@@ -55,6 +58,7 @@ export function LoadTestDrawer() {
           concurrency,
           message: prompt,
           customToolsEnabled,
+          customSystemPromptEnabled,
           mcpMultiprocessEnabled,
         }),
       });
@@ -102,6 +106,7 @@ export function LoadTestDrawer() {
   }, [
     concurrencyInput,
     customToolsEnabled,
+    customSystemPromptEnabled,
     mcpMultiprocessEnabled,
     promptInput,
   ]);
@@ -172,6 +177,21 @@ export function LoadTestDrawer() {
               />
               <span className="text-sm font-medium">
                 Codex stdio 自定义工具调用
+              </span>
+            </label>
+
+            <label className="mt-3 flex items-start gap-3">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 rounded border-black/20 accent-zinc-950 dark:border-white/20 dark:bg-zinc-900 dark:accent-zinc-100"
+                checked={customSystemPromptEnabled}
+                disabled={isLoadTesting}
+                onChange={(event) =>
+                  setCustomSystemPromptEnabled(event.target.checked)
+                }
+              />
+              <span className="text-sm font-medium">
+                启用完全自定义系统提示词
               </span>
             </label>
 

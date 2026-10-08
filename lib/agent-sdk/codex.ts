@@ -4,6 +4,7 @@ import { buildCustomToolsConfig } from "@/lib/agent-sdk/custom-tools";
 import {
   buildMultiAgentInstructions,
 } from "@/lib/agent-sdk/game-orchestrator";
+import { buildModelInstructionsPath } from "@/lib/agent-sdk/system-prompt";
 import {
   getToolCallSummary,
   getAgentCallSummary,
@@ -40,6 +41,8 @@ export async function streamCodexReply(
     const customToolsConfig = customToolsEnabled
       ? buildCustomToolsConfig(projectToolsServerCount)
       : { mcp_servers: {} };
+    // 只有调用方显式开启才覆盖内置系统提示词；普通聊天不传时使用 Codex 原生模板。
+    const customSystemPromptEnabled = options.customSystemPromptEnabled === true;
 
     const codex = new Codex({
       config: {
@@ -67,6 +70,15 @@ export async function streamCodexReply(
         // 多 Agent 游戏开发协作规则，作为 developer_instructions 注入模型上下文。
         // 模型根据用户意图自主判断是否 spawn 子 agent，不做关键词硬编码。
         developer_instructions: buildMultiAgentInstructions(),
+        ...(customSystemPromptEnabled
+          ? {
+              // 自定义系统提示词：完全覆盖 Codex 内置模板。
+              // codex-cli 0.159.0 不认识 base_instructions 键，
+              // 必须用等价键 model_instructions_file 指向提示词文件。
+              // spawn_agent 拉起的子 agent 也会继承这份系统提示词。
+              model_instructions_file: buildModelInstructionsPath(),
+            }
+          : {}),
         // 启用多 Agent 协作。
         // agents.enabled 默认就是 true，显式声明便于后续调整并发数和角色定义。
         // 是否实际使用取决于模型能力：支持 V2 的模型会获得 spawn_agent 等工具。

@@ -15,6 +15,7 @@ export async function POST(request: Request) {
     concurrency?: unknown;
     message?: unknown;
     customToolsEnabled?: unknown;
+    customSystemPromptEnabled?: unknown;
     mcpMultiprocessEnabled?: unknown;
   };
 
@@ -32,6 +33,9 @@ export async function POST(request: Request) {
     requestBody.customToolsEnabled === undefined
       ? true
       : requestBody.customToolsEnabled === true;
+  // 不传或传 false 都使用 Codex 内置模板；这是新开关的显式启用语义。
+  const customSystemPromptEnabled =
+    requestBody.customSystemPromptEnabled === true;
   // 复选框关闭或旧客户端未传值时，仍保持单 project_tools server。
   const mcpMultiprocessEnabled = requestBody.mcpMultiprocessEnabled === true;
 
@@ -54,6 +58,7 @@ export async function POST(request: Request) {
     concurrency,
     message,
     customToolsEnabled,
+    customSystemPromptEnabled,
     mcpMultiprocessEnabled,
   });
 

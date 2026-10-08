@@ -11,6 +11,8 @@ type LoadTestState = {
   concurrency: number;
   message: string;
   customToolsEnabled: boolean;
+  // 开启后使用 system-prompt.md 完全覆盖 Codex 内置系统提示词。
+  customSystemPromptEnabled: boolean;
   // 开启后每个压测请求都会注册 3 个 stdio MCP server，用于验证“一配置一进程”。
   mcpMultiprocessEnabled: boolean;
   status: LoadTestStatus;
@@ -159,6 +161,7 @@ export function startLoadTest(input: {
   concurrency: number;
   message: string;
   customToolsEnabled: boolean;
+  customSystemPromptEnabled: boolean;
   mcpMultiprocessEnabled: boolean;
 }): LoadTestSummary {
   const currentTest = getLoadTestState();
@@ -172,6 +175,7 @@ export function startLoadTest(input: {
     concurrency: input.concurrency,
     message: input.message,
     customToolsEnabled: input.customToolsEnabled,
+    customSystemPromptEnabled: input.customSystemPromptEnabled,
     mcpMultiprocessEnabled: input.mcpMultiprocessEnabled,
     status: "running",
     active: 0,
@@ -211,6 +215,7 @@ export async function runLoadTest(loadTestId: string): Promise<void> {
       await streamCodexReply({
         message: state.message,
         customToolsEnabled: state.customToolsEnabled,
+        customSystemPromptEnabled: state.customSystemPromptEnabled,
         projectToolsServerCount: state.mcpMultiprocessEnabled
           ? MCP_MULTIPROCESS_SERVER_COUNT
           : 1,
