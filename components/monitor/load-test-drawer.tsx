@@ -144,6 +144,21 @@ export function LoadTestDrawer() {
               required
               value={promptInput}
             />
+            <details className="mt-2 text-sm">
+              <summary className="cursor-pointer text-zinc-600 dark:text-zinc-400">
+                如何触发多 Agent
+              </summary>
+              <div className="mt-2 space-y-2 text-zinc-600 dark:text-zinc-400">
+                <p>
+                  当前模型支持多 Agent 时，明确要求派生、等待和关闭子 Agent
+                  最容易触发内置协作工具。可把 prompt 改成：
+                </p>
+                <p className="rounded-lg bg-zinc-100 p-3 font-mono text-xs text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+                  请创建 1 个 game_designer 子 agent 设计一个浏览器小游戏玩法；
+                  等待它完成后，用一句话汇总最终玩法和操作方式。
+                </p>
+              </div>
+            </details>
           </div>
 
           <div className="rounded-xl border border-black/5 bg-white p-4 dark:border-white/10 dark:bg-zinc-950">
