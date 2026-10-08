@@ -2,9 +2,14 @@ import { Codex } from "@openai/codex-sdk";
 import { beginCodexRequest } from "@/lib/monitor/request-metrics";
 import { buildCustomToolsConfig } from "@/lib/agent-sdk/custom-tools";
 import {
+  buildMultiAgentInstructions,
+} from "@/lib/agent-sdk/game-orchestrator";
+import {
   getToolCallSummary,
+  getAgentCallSummary,
   isAgentMessageEvent,
   isMcpToolCallEvent,
+  type CollabToolCallRawItem,
 } from "@/lib/agent-sdk/codex-events";
 import type { CodexStreamOptions } from "@/types/codex";
 
@@ -59,11 +64,28 @@ export async function streamCodexReply(
           },
         },
         },
+        // 多 Agent 游戏开发协作规则，作为 developer_instructions 注入模型上下文。
+        // 模型根据用户意图自主判断是否 spawn 子 agent，不做关键词硬编码。
+        developer_instructions: buildMultiAgentInstructions(),
+        // 启用多 Agent 协作。
+        // agents.enabled 默认就是 true，显式声明便于后续调整并发数和角色定义。
+        // 是否实际使用取决于模型能力：支持 V2 的模型会获得 spawn_agent 等工具。
+        agents: {
+          enabled: true,
+          // 游戏开发场景的两个角色，模型的 spawn_agent 工具会在 agent_type 参数中展示它们。
+          game_designer: {
+            description: "游戏策划角色，输出玩法规则、界面描述、操作方式和计分机制。",
+          },
+          game_developer: {
+            description: "游戏开发角色，根据策划文档写出可直接在浏览器运行的完整 HTML 文件。",
+          },
+        },
       },
     });
     const thread = options.threadId
       ? codex.resumeThread(options.threadId, threadOptions)
       : codex.startThread(threadOptions);
+
     const { events } = await thread.runStreamed(options.message, {
       // 调用方执行 abortController.abort() 时， signal 会进入 aborted 状态，SDK 就会取消当前正在运行的 Codex 回合并停止接收事件流。
       signal: options.signal,
@@ -103,6 +125,29 @@ export async function streamCodexReply(
           tool: event.item.tool,
           status: event.item.status,
           summary: getToolCallSummary(event.item),
+        });
+        continue;
+      }
+
+      // 多 Agent 协作工具调用（spawn_agent 等）。
+      // 事件流的 item.type 是 "collab_tool_call"，SDK 类型还没收录但 JSON 会透传。
+      if (
+        (event.type === "item.started" ||
+          event.type === "item.updated" ||
+          event.type === "item.completed") &&
+        (event.item as Record<string, unknown>).type === "collab_tool_call"
+      ) {
+        // SDK 的 ThreadItem 联合类型还没收录 collab_tool_call，
+        // 但底层 JSON 会透传，这里安全地做一次窄化断言。
+        const item = event.item as unknown as CollabToolCallRawItem;
+
+        options.onEvent({
+          type: "agent",
+          toolId: item.id,
+          tool: item.tool,
+          status: item.status as "in_progress" | "completed" | "failed",
+          agentCount: item.receiver_thread_ids?.length ?? 0,
+          summary: getAgentCallSummary(item),
         });
         continue;
       }

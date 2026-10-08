@@ -131,6 +131,35 @@ export default function Home() {
                 };
               }),
             );
+          } else if (streamEvent.type === "agent") {
+            setMessages((current) =>
+              current.map((message) => {
+                if (message.id !== assistantMessage.id) {
+                  return message;
+                }
+
+                const agents = message.agents ?? [];
+                const existingIndex = agents.findIndex(
+                  (agent) => agent.id === streamEvent.toolId,
+                );
+                const nextAgent = {
+                  id: streamEvent.toolId,
+                  tool: streamEvent.tool,
+                  status: streamEvent.status,
+                  agentCount: streamEvent.agentCount,
+                  summary: streamEvent.summary,
+                };
+
+                if (existingIndex === -1) {
+                  return { ...message, agents: [...agents, nextAgent] };
+                }
+
+                return {
+                  ...message,
+                  agents: agents.with(existingIndex, nextAgent),
+                };
+              }),
+            );
           } else if (streamEvent.type === "error") {
             throw new Error(streamEvent.message);
           }
@@ -210,6 +239,39 @@ export default function Home() {
                           {toolCall.summary ? (
                             <p className="mt-1 whitespace-pre-wrap break-all text-zinc-600 dark:text-zinc-400">
                               {toolCall.summary}
+                            </p>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {message.role === "assistant" && message.agents ? (
+                    <div className="mb-3 flex flex-col gap-2">
+                      {message.agents.map((agent) => (
+                        <div
+                          key={agent.id}
+                          className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs dark:border-indigo-900 dark:bg-indigo-950/30"
+                        >
+                          <div className="flex items-center gap-2 font-medium text-indigo-700 dark:text-indigo-300">
+                            <span
+                              className={`size-1.5 rounded-full ${
+                                agent.status === "in_progress"
+                                  ? "animate-pulse bg-indigo-500"
+                                  : agent.status === "completed"
+                                    ? "bg-emerald-500"
+                                    : "bg-red-500"
+                              }`}
+                            />
+                            🤖 {agent.tool}
+                            {agent.agentCount > 0 ? (
+                              <span className="ml-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-normal text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-300">
+                                {agent.agentCount} agent
+                              </span>
+                            ) : null}
+                          </div>
+                          {agent.summary ? (
+                            <p className="mt-1 text-indigo-600 dark:text-indigo-400">
+                              {agent.summary}
                             </p>
                           ) : null}
                         </div>
