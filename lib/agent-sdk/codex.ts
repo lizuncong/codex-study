@@ -13,6 +13,7 @@ import {
   type CollabToolCallRawItem,
 } from "@/lib/agent-sdk/codex-events";
 import type { CodexStreamOptions } from "@/types/codex";
+import { streamCodexReplyViaAppServer } from "@/lib/codex-app-server";
 
 const threadOptions = {
   // 不请求人工审批：Codex 可以直接执行当前回合内允许的操作。
@@ -25,6 +26,12 @@ const threadOptions = {
 export async function streamCodexReply(
   options: CodexStreamOptions,
 ): Promise<void> {
+  // app-server 路径：所有请求复用一个长驻 codex app-server 进程。
+  // 压测并发高时显著减少进程数和内存开销；默认关闭保持旧行为。
+  if (options.appServerEnabled === true) {
+    return streamCodexReplyViaAppServer(options);
+  }
+
   const requestTracker = beginCodexRequest();
 
   try {

@@ -45,7 +45,7 @@ type PsRecord = {
 };
 
 const codexExecPattern =
-  /(?:^|\/)codex(?:\.exe)? exec(?:\s|$)|codex(?:\.exe)?\.js exec(?:\s|$)/;
+  /(?:^|\/)codex(?:\.exe)? (?:exec|app-server)(?:\s|$)|codex(?:\.exe)?\.js (?:exec|app-server)(?:\s|$)/;
 
 function parseNumber(value: string): number {
   const parsed = Number(value);

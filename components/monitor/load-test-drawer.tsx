@@ -19,6 +19,8 @@ export function LoadTestDrawer() {
   const [customSystemPromptEnabled, setCustomSystemPromptEnabled] =
     useState(false);
   const [mcpMultiprocessEnabled, setMcpMultiprocessEnabled] = useState(false);
+  // 默认不勾选 = 保持每次 spawn codex exec；勾选后切换到长驻 app-server 协议。
+  const [appServerEnabled, setAppServerEnabled] = useState(false);
   const [isLoadTesting, setIsLoadTesting] = useState(false);
   const [loadTestConcurrency, setLoadTestConcurrency] = useState(0);
   const [loadTestProgress, setLoadTestProgress] = useState(0);
@@ -60,6 +62,7 @@ export function LoadTestDrawer() {
           customToolsEnabled,
           customSystemPromptEnabled,
           mcpMultiprocessEnabled,
+          appServerEnabled,
         }),
       });
       const result = (await response.json().catch(() => null)) as {
@@ -108,6 +111,7 @@ export function LoadTestDrawer() {
     customToolsEnabled,
     customSystemPromptEnabled,
     mcpMultiprocessEnabled,
+    appServerEnabled,
     promptInput,
   ]);
 
@@ -139,6 +143,21 @@ export function LoadTestDrawer() {
           <div>
             <label className="text-sm font-medium" htmlFor="load-test-prompt">
               压测 prompt
+            </label>
+
+            <label className="mt-3 flex items-start gap-3">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 rounded border-black/20 accent-zinc-950 dark:border-white/20 dark:bg-zinc-900 dark:accent-zinc-100"
+                checked={appServerEnabled}
+                disabled={isLoadTesting}
+                onChange={(event) =>
+                  setAppServerEnabled(event.target.checked)
+                }
+              />
+              <span className="text-sm font-medium">
+                启用 Codex App Server
+              </span>
             </label>
             <textarea
               className="mt-2 min-h-28 w-full resize-y rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-400 disabled:cursor-not-allowed disabled:bg-zinc-100 dark:border-white/10 dark:bg-zinc-950 dark:focus:border-zinc-600 dark:disabled:bg-zinc-900"

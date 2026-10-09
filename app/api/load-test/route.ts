@@ -17,6 +17,7 @@ export async function POST(request: Request) {
     customToolsEnabled?: unknown;
     customSystemPromptEnabled?: unknown;
     mcpMultiprocessEnabled?: unknown;
+    appServerEnabled?: unknown;
   };
 
   try {
@@ -38,6 +39,8 @@ export async function POST(request: Request) {
     requestBody.customSystemPromptEnabled === true;
   // 复选框关闭或旧客户端未传值时，仍保持单 project_tools server。
   const mcpMultiprocessEnabled = requestBody.mcpMultiprocessEnabled === true;
+  // 默认不勾选 = 保持 codex exec 行为；勾选后切换到 app-server 协议。
+  const appServerEnabled = requestBody.appServerEnabled === true;
 
   if (
     !Number.isInteger(concurrency) ||
@@ -60,6 +63,7 @@ export async function POST(request: Request) {
     customToolsEnabled,
     customSystemPromptEnabled,
     mcpMultiprocessEnabled,
+    appServerEnabled,
   });
 
   after(() => runLoadTest(loadTest.loadTestId));
