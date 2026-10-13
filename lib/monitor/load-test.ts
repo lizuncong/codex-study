@@ -15,6 +15,8 @@ type LoadTestState = {
   customSystemPromptEnabled: boolean;
   // 开启后每个压测请求都会注册 3 个 stdio MCP server，用于验证“一配置一进程”。
   mcpMultiprocessEnabled: boolean;
+  // 开启后 project_tools 指向共享 Streamable HTTP MCP，而不是每个线程拉起 stdio 子进程。
+  standaloneMcpEnabled: boolean;
   // 开启后走 codex app-server 长驻进程协议，而不是每次 spawn codex exec。
   appServerEnabled: boolean;
   status: LoadTestStatus;
@@ -165,6 +167,7 @@ export function startLoadTest(input: {
   customToolsEnabled: boolean;
   customSystemPromptEnabled: boolean;
   mcpMultiprocessEnabled: boolean;
+  standaloneMcpEnabled: boolean;
   appServerEnabled: boolean;
 }): LoadTestSummary {
   const currentTest = getLoadTestState();
@@ -180,6 +183,7 @@ export function startLoadTest(input: {
     customToolsEnabled: input.customToolsEnabled,
     customSystemPromptEnabled: input.customSystemPromptEnabled,
     mcpMultiprocessEnabled: input.mcpMultiprocessEnabled,
+    standaloneMcpEnabled: input.standaloneMcpEnabled,
     appServerEnabled: input.appServerEnabled,
     status: "running",
     active: 0,
@@ -223,6 +227,7 @@ export async function runLoadTest(loadTestId: string): Promise<void> {
         projectToolsServerCount: state.mcpMultiprocessEnabled
           ? MCP_MULTIPROCESS_SERVER_COUNT
           : 1,
+        standaloneMcpEnabled: state.standaloneMcpEnabled,
         appServerEnabled: state.appServerEnabled,
         signal: state.abortController.signal,
         onEvent: () => {},

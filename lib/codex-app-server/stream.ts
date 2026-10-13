@@ -54,29 +54,43 @@ function getAgentCallSummary(item: AppServerThreadItem): string {
   return `${completed} 个子 Agent 全部完成。`;
 }
 
-// 单例连接：同一个 Next.js 服务进程只启动一个 app-server。
+// 按传输模式缓存 app-server。同一个 Next.js 进程最多维护 STDIO/HTTP 两条长驻连接。
 // Next.js dev 模式热重载时会重新执行模块，这里用 globalThis 避免 spawn 泄漏。
 const globalForAppServer = globalThis as unknown as {
-  __codexAppServerConnection?: AppServerConnection;
+  __codexAppServerConnectionsByMcpMode?: Map<
+    "http" | "stdio",
+    AppServerConnection
+  >;
 };
 
-function getConnection(): AppServerConnection {
+function getConnection(standaloneMcpEnabled: boolean): AppServerConnection {
   // 关键修复：不再用 isReady 判断是否需要重建。
   // 并发请求同时调用时，第一个请求的 initialize 还没完成（isReady=false），
   // 如果这里 dispose 再新建，后续请求会把第一个请求的连接销毁。
   // 正确做法：只要连接对象存在就复用，让 connect() 内部通过 initPromise 去重。
   // 进程崩溃后 exit handler 会重置状态，下一次 connect() 会自动重新 spawn。
-  if (!globalForAppServer.__codexAppServerConnection) {
-    globalForAppServer.__codexAppServerConnection = new AppServerConnection();
+  globalForAppServer.__codexAppServerConnectionsByMcpMode ??= new Map();
+  const connectionKey = standaloneMcpEnabled ? "http" : "stdio";
+  const existingConnection =
+    globalForAppServer.__codexAppServerConnectionsByMcpMode.get(connectionKey);
+
+  if (existingConnection) {
+    return existingConnection;
   }
-  return globalForAppServer.__codexAppServerConnection;
+
+  const connection = new AppServerConnection();
+  globalForAppServer.__codexAppServerConnectionsByMcpMode.set(
+    connectionKey,
+    connection,
+  );
+  return connection;
 }
 
 export async function streamCodexReplyViaAppServer(
   options: CodexStreamOptions,
 ): Promise<void> {
   const requestTracker = beginCodexRequest();
-  const connection = getConnection();
+  const connection = getConnection(options.standaloneMcpEnabled === true);
 
   try {
     // 和 exec 路径一样构建 config 覆盖。
@@ -89,7 +103,10 @@ export async function streamCodexReplyViaAppServer(
           ? options.projectToolsServerCount
           : 1;
     const customToolsConfig = customToolsEnabled
-      ? buildCustomToolsConfig(projectToolsServerCount)
+      ? buildCustomToolsConfig(
+          projectToolsServerCount,
+          options.standaloneMcpEnabled === true,
+        )
       : { mcp_servers: {} };
     const customSystemPromptEnabled = options.customSystemPromptEnabled === true;
 
@@ -100,7 +117,12 @@ export async function streamCodexReplyViaAppServer(
       thread_unload_delay_secs: 0,
       mcp_servers: {
         ...customToolsConfig.mcp_servers,
-        node_repl: { enabled: false },
+        // app-server 的配置覆盖同样需要完整 transport；只传 enabled=false 会启动即退出。
+        node_repl: {
+          enabled: false,
+          command: "/usr/bin/true",
+          args: [],
+        },
       },
       plugins: {
         "unified-computer-use@openai-bundled": {

@@ -24,7 +24,7 @@ export const getProjectInfoTool = {
       projectName: packageJson.name ?? "unknown",
       projectVersion: packageJson.version ?? "unknown",
       nodeVersion: process.version,
-      mcpTransport: "stdio",
+      mcpTransport: context.transport ?? "stdio",
     });
   },
 };
