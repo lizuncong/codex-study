@@ -46,7 +46,10 @@ export async function streamCodexReply(
           ? options.projectToolsServerCount
           : 1;
     const customToolsConfig = customToolsEnabled
-      ? buildCustomToolsConfig(projectToolsServerCount)
+      ? buildCustomToolsConfig(
+          projectToolsServerCount,
+          options.standaloneMcpEnabled === true,
+        )
       : { mcp_servers: {} };
     // 只有调用方显式开启才覆盖内置系统提示词；普通聊天不传时使用 Codex 原生模板。
     const customSystemPromptEnabled = options.customSystemPromptEnabled === true;
@@ -61,8 +64,12 @@ export async function streamCodexReply(
         mcp_servers: {
           // 必须合并而不是覆盖，否则 project_tools 会在这里被丢弃。
           ...customToolsConfig.mcp_servers,
+          // 0.159.0 覆盖 enabled=false 时必须同时保留完整 transport；
+          // 只传 enabled=false 会被解析成 missing transport 并导致启动失败。
           node_repl: {
             enabled: false,
+            command: "/usr/bin/true",
+            args: [],
           },
         },
         plugins: {

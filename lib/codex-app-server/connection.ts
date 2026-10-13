@@ -141,6 +141,7 @@ export class AppServerConnection {
   private isInitialized = false;
   private initPromise: Promise<void> | null = null;
   private disposed = false;
+  private lastStderr = "";
 
   /**
    * 启动 app-server 进程并发送 initialize 握手。
@@ -189,14 +190,27 @@ export class AppServerConnection {
 
     this.process.stderr?.setEncoding("utf8");
     this.process.stderr?.on("data", (chunk: string) => {
+      // 保留最后几行，进程退出时能直接把配置/transport 错误带回调用方。
+      this.lastStderr = `${this.lastStderr}${chunk}`.slice(-4000);
       console.error("[codex-app-server stderr]", chunk.trim());
     });
 
-    this.process.on("exit", () => {
-      this.rejectAllPending(new Error("codex app-server 进程已退出。"));
+    this.process.on("exit", (code, signal) => {
+      const stderr = this.lastStderr.trim();
+      const exitDetail = [
+        `code=${code ?? "null"}`,
+        `signal=${signal ?? "null"}`,
+        stderr ? `stderr=${stderr}` : "",
+      ]
+        .filter(Boolean)
+        .join(", ");
+      this.rejectAllPending(
+        new Error(`codex app-server 进程已退出（${exitDetail}）。`),
+      );
       this.process = null;
       this.isInitialized = false;
       this.initPromise = null;
+      this.lastStderr = "";
     });
 
     this.process.on("error", (error) => {

@@ -8,7 +8,7 @@ import type { LoadTestSummary } from "@/types/load-test";
 
 // 参数收敛在抽屉内，页面头部只需要一个入口，避免占满监控工具栏。
 const defaultLoadTestPrompt = "写1000字关于春天的作文";
-const maxLoadTestConcurrency = 50;
+const maxLoadTestConcurrency = 1000;
 
 export function LoadTestDrawer() {
   const [isOpen, setIsOpen] = useState(false);
@@ -19,6 +19,7 @@ export function LoadTestDrawer() {
   const [customSystemPromptEnabled, setCustomSystemPromptEnabled] =
     useState(false);
   const [mcpMultiprocessEnabled, setMcpMultiprocessEnabled] = useState(false);
+  const [standaloneMcpEnabled, setStandaloneMcpEnabled] = useState(false);
   // 默认不勾选 = 保持每次 spawn codex exec；勾选后切换到长驻 app-server 协议。
   const [appServerEnabled, setAppServerEnabled] = useState(false);
   const [isLoadTesting, setIsLoadTesting] = useState(false);
@@ -62,6 +63,7 @@ export function LoadTestDrawer() {
           customToolsEnabled,
           customSystemPromptEnabled,
           mcpMultiprocessEnabled,
+          standaloneMcpEnabled,
           appServerEnabled,
         }),
       });
@@ -111,6 +113,7 @@ export function LoadTestDrawer() {
     customToolsEnabled,
     customSystemPromptEnabled,
     mcpMultiprocessEnabled,
+    standaloneMcpEnabled,
     appServerEnabled,
     promptInput,
   ]);
@@ -218,8 +221,29 @@ export function LoadTestDrawer() {
               <input
                 type="checkbox"
                 className="mt-0.5 size-4 rounded border-black/20 accent-zinc-950 dark:border-white/20 dark:bg-zinc-900 dark:accent-zinc-100"
-                checked={mcpMultiprocessEnabled}
+                checked={standaloneMcpEnabled}
                 disabled={isLoadTesting || !customToolsEnabled}
+                onChange={(event) => {
+                  const checked = event.target.checked;
+                  setStandaloneMcpEnabled(checked);
+
+                  // 两种传输互斥：HTTP 模式下多个 stdio server 配置没有意义。
+                  if (checked) {
+                    setMcpMultiprocessEnabled(false);
+                  }
+                }}
+              />
+              <span className="text-sm font-medium">启用独立 MCP 服务</span>
+            </label>
+
+            <label className="mt-3 flex items-start gap-3">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 rounded border-black/20 accent-zinc-950 dark:border-white/20 dark:bg-zinc-900 dark:accent-zinc-100"
+                checked={mcpMultiprocessEnabled}
+                disabled={
+                  isLoadTesting || !customToolsEnabled || standaloneMcpEnabled
+                }
                 onChange={(event) =>
                   setMcpMultiprocessEnabled(event.target.checked)
                 }
@@ -237,6 +261,11 @@ export function LoadTestDrawer() {
                 <p>
                   勾选后，每个压测请求都会注册本地 <code>project_tools</code> MCP
                   server，并启动对应的 stdio 子进程。
+                </p>
+                <p>
+                  开启 <span className="font-medium">启用独立 MCP
+                  服务</span> 后，所有压测请求连接同一个 Streamable HTTP
+                  服务。请先运行 <code>pnpm mcp:http</code>。
                 </p>
                 <p>
                   开启 <span className="font-medium">stdio MCP
@@ -358,9 +387,11 @@ export function LoadTestDrawer() {
               <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
                 <p className="font-medium">前 3 个错误</p>
                 <ul className="mt-2 list-disc space-y-1 pl-5">
-                  {loadTestSummary.errors.slice(0, 3).map((errorMessage) => (
-                    <li key={errorMessage}>{errorMessage}</li>
-                  ))}
+                  {loadTestSummary.errors.slice(0, 3).map(
+                    (errorMessage, index) => (
+                      <li key={`${index}-${errorMessage}`}>{errorMessage}</li>
+                    ),
+                  )}
                 </ul>
               </div>
             ) : null}

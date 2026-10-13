@@ -17,6 +17,7 @@ export async function POST(request: Request) {
     customToolsEnabled?: unknown;
     customSystemPromptEnabled?: unknown;
     mcpMultiprocessEnabled?: unknown;
+    standaloneMcpEnabled?: unknown;
     appServerEnabled?: unknown;
   };
 
@@ -39,16 +40,18 @@ export async function POST(request: Request) {
     requestBody.customSystemPromptEnabled === true;
   // 复选框关闭或旧客户端未传值时，仍保持单 project_tools server。
   const mcpMultiprocessEnabled = requestBody.mcpMultiprocessEnabled === true;
+  // 独立 HTTP MCP 需要先通过 pnpm mcp:http 启动；开关只控制 Codex 配置选择。
+  const standaloneMcpEnabled = requestBody.standaloneMcpEnabled === true;
   // 默认不勾选 = 保持 codex exec 行为；勾选后切换到 app-server 协议。
   const appServerEnabled = requestBody.appServerEnabled === true;
 
   if (
     !Number.isInteger(concurrency) ||
     concurrency < 1 ||
-    concurrency > 50
+    concurrency > 1000
   ) {
     return Response.json(
-      { error: "并发数量必须是 1-50 的整数。" },
+      { error: "并发数量必须是 1-1000 的整数。" },
       { status: 400 },
     );
   }
@@ -63,6 +66,7 @@ export async function POST(request: Request) {
     customToolsEnabled,
     customSystemPromptEnabled,
     mcpMultiprocessEnabled,
+    standaloneMcpEnabled,
     appServerEnabled,
   });
 

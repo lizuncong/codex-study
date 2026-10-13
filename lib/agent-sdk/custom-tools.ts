@@ -1,7 +1,25 @@
 import path from "node:path";
 
 // Next.js 的 API Route 运行在 Node.js 服务端，可以安全地用 process.execPath 启动 MCP 子进程。
-export function buildCustomToolsConfig(serverCount = 1) {
+export function buildCustomToolsConfig(
+  serverCount = 1,
+  standaloneHttpEnabled = false,
+) {
+  // 开启独立服务后只注册一个逻辑 server；真实执行进程由共享 HTTP 服务承载。
+  if (standaloneHttpEnabled) {
+    return {
+      mcp_servers: {
+        project_tools: {
+          url: process.env.MCP_HTTP_URL ?? "http://127.0.0.1:8787/mcp",
+          default_tools_approval_mode: "approve",
+          supports_parallel_tool_calls: true,
+          startup_timeout_sec: 10,
+          tool_timeout_sec: 10,
+        },
+      },
+    };
+  }
+
   const serverScriptPath = path.join(
     process.cwd(),
     "scripts",
